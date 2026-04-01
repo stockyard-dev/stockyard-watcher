@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  watcher:
+    build: .
+    ports:
+      - "9240:9240"
+    environment:
+      - PORT=9240
+      - DATA_DIR=/data
+      - WATCHER_LICENSE_KEY=
+    volumes:
+      - watcher_data:/data
+    restart: unless-stopped
+volumes:
+  watcher_data:
