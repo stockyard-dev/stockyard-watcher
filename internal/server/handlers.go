@@ -1,60 +1,8 @@
 package server
-
-import (
-	"encoding/json"
-	"net/http"
-	"strconv"
-)
-
-type Item struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
-}
-
-func (s *Server) handleListItems(w http.ResponseWriter, r *http.Request) {
-	// List items — tool-specific query would go here
-	writeJSON(w, http.StatusOK, []Item{})
-}
-
-func (s *Server) handleCreateItem(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Name string `json:"name"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request")
-		return
-	}
-	if req.Name == "" {
-		writeError(w, http.StatusBadRequest, "name required")
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]string{"status": "created", "name": req.Name})
-}
-
-func (s *Server) handleGetItem(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
-		return
-	}
-	writeJSON(w, http.StatusOK, Item{ID: id})
-}
-
-func (s *Server) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
-}
-
-func (s *Server) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
-}
-
-func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html")
-	w.Write(dashboardHTML)
-}
+import("encoding/json";"fmt";"net/http";"strconv";"time";"github.com/stockyard-dev/stockyard-watcher/internal/store")
+func(s *Server)handleListMonitors(w http.ResponseWriter,r *http.Request){list,_:=s.db.ListMonitors();if list==nil{list=[]store.Monitor{}};writeJSON(w,200,list)}
+func(s *Server)handleCreateMonitor(w http.ResponseWriter,r *http.Request){var m store.Monitor;json.NewDecoder(r.Body).Decode(&m);if m.Name==""||m.URL==""{writeError(w,400,"name and url required");return};if err:=s.db.CreateMonitor(&m);err!=nil{writeError(w,500,err.Error());return};writeJSON(w,201,m)}
+func(s *Server)handleDeleteMonitor(w http.ResponseWriter,r *http.Request){id,_:=strconv.ParseInt(r.PathValue("id"),10,64);s.db.DeleteMonitor(id);writeJSON(w,200,map[string]string{"status":"deleted"})}
+func(s *Server)handleCheck(w http.ResponseWriter,r *http.Request){id,_:=strconv.ParseInt(r.PathValue("id"),10,64);monitors,_:=s.db.ListMonitors();var mon *store.Monitor;for i:=range monitors{if monitors[i].ID==id{mon=&monitors[i];break}};if mon==nil{writeError(w,404,"not found");return};start:=time.Now();client:=&http.Client{Timeout:time.Duration(mon.TimeoutSec)*time.Second};req,err:=http.NewRequest(mon.Method,mon.URL,nil);var status string;var statusCode,latencyMs int;var errMsg string;if err!=nil{status="down";errMsg=err.Error()}else{resp,err:=client.Do(req);latencyMs=int(time.Since(start).Milliseconds());if err!=nil{status="down";errMsg=err.Error()}else{resp.Body.Close();statusCode=resp.StatusCode;if statusCode==mon.ExpectStatus{status="up"}else{status="down";errMsg=fmt.Sprintf("got %d expected %d",statusCode,mon.ExpectStatus)}}};s.db.RecordCheck(id,status,latencyMs,statusCode,errMsg);writeJSON(w,200,map[string]interface{}{"status":status,"latency_ms":latencyMs,"status_code":statusCode,"error":errMsg})}
+func(s *Server)handleHistory(w http.ResponseWriter,r *http.Request){id,_:=strconv.ParseInt(r.PathValue("id"),10,64);limit,_:=strconv.Atoi(r.URL.Query().Get("limit"));list,_:=s.db.GetHistory(id,limit);if list==nil{list=[]store.CheckResult{}};writeJSON(w,200,list)}
+func(s *Server)handleStats(w http.ResponseWriter,r *http.Request){n,_:=s.db.CountMonitors();d,_:=s.db.CountDown();writeJSON(w,200,map[string]interface{}{"monitors":n,"down":d})}
