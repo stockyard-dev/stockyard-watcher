@@ -1,7 +1,7 @@
 package server
 import ("encoding/json";"log";"net/http";"github.com/stockyard-dev/stockyard-watcher/internal/store")
-type Server struct{db *store.DB;mux *http.ServeMux}
-func New(db *store.DB)*Server{s:=&Server{db:db,mux:http.NewServeMux()}
+type Server struct{db *store.DB;mux *http.ServeMux;limits Limits}
+func New(db *store.DB,limits Limits)*Server{s:=&Server{db:db,mux:http.NewServeMux(),limits:limits}
 s.mux.HandleFunc("GET /api/watches",s.listWatches);s.mux.HandleFunc("POST /api/watches",s.createWatch);s.mux.HandleFunc("GET /api/watches/{id}",s.getWatch);s.mux.HandleFunc("DELETE /api/watches/{id}",s.deleteWatch);s.mux.HandleFunc("POST /api/watches/{id}/toggle",s.toggleWatch)
 s.mux.HandleFunc("POST /api/changes",s.recordChange);s.mux.HandleFunc("GET /api/watches/{id}/changes",s.listChanges)
 s.mux.HandleFunc("GET /api/stats",s.stats);s.mux.HandleFunc("GET /api/health",s.health)
